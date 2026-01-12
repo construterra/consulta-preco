@@ -10,6 +10,7 @@
             --bg-light: #f1f3f4;
             --border-color: #dfe1e5;
             --locked-color: #777;
+            --text-gray: #666;
         }
 
         body {
@@ -36,9 +37,17 @@
         h1 {
             color: var(--main-color);
             font-size: 3rem;
-            margin-bottom: 20px;
+            margin-bottom: 5px; /* Reduzi margem para colar no subtitulo */
             margin-top: 0;
             letter-spacing: -1px;
+        }
+
+        /* ESTILO DA DATA (NOVO) */
+        .date-subtitle {
+            font-size: 1rem;
+            color: var(--text-gray);
+            margin-bottom: 25px;
+            font-weight: 500;
         }
 
         .top-image {
@@ -135,6 +144,7 @@
         @media (max-width: 600px) {
             h1 { font-size: 2rem; }
             .header-container { margin-top: 20px; }
+            .date-subtitle { font-size: 0.9rem; }
         }
         
         .loader {
@@ -154,6 +164,9 @@
 
     <div class="header-container">
         <h1>Pesquisa de Produtos</h1>
+        
+        <div id="dataDisplay" class="date-subtitle"></div>
+
         <img src="topo.jpg" alt="Imagem do Topo" class="top-image" onerror="this.style.display='none'">
         
         <div class="loader" id="loader"></div>
@@ -173,11 +186,14 @@
 
     <script>
         // =================================================================
-        // CONFIGURAÇÃO: COLE SEU LINK COM PROXY ABAIXO
-        // Exemplo: "https://corsproxy.io/?https://docs.google.com/..."
+        // CONFIGURAÇÃO
         // =================================================================
+        
+        // COLE SEU LINK COM O PROXY AQUI:
         const LINK_DA_PLANILHA = "https://corsproxy.io/?https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv"; 
+        
         const SENHA_MESTRE = "1234";
+
         // =================================================================
 
         let productsData = [];
@@ -186,6 +202,7 @@
         const searchInput = document.getElementById('searchInput');
         const statusMsg = document.getElementById('status');
         const loader = document.getElementById('loader');
+        const dataDisplay = document.getElementById('dataDisplay');
 
         window.addEventListener('DOMContentLoaded', () => {
             if (LINK_DA_PLANILHA === "") {
@@ -198,7 +215,7 @@
 
         function loadCSV() {
             loader.style.display = 'block';
-            statusMsg.innerText = "Atualizando dados...";
+            statusMsg.innerText = "Sincronizando dados...";
 
             fetch(LINK_DA_PLANILHA)
                 .then(response => {
@@ -206,9 +223,18 @@
                     return response.arrayBuffer(); 
                 })
                 .then(buffer => {
+                    // Decodifica e Processa
                     const decoder = new TextDecoder('utf-8'); 
                     const text = decoder.decode(buffer);
                     parseCSV(text);
+
+                    // ATUALIZA A DATA VISUAL
+                    // Pega a data de agora formatada para o padrão brasileiro
+                    const dataHoje = new Date().toLocaleString('pt-BR', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                    dataDisplay.innerText = "Sincronizado com o Drive em: " + dataHoje;
                 })
                 .catch(error => {
                     console.error("Erro:", error);
@@ -245,7 +271,7 @@
 
             setupTableHeaders();
             loader.style.display = 'none';
-            statusMsg.innerText = `${productsData.length} itens carregados.`;
+            statusMsg.innerText = `${productsData.length} produtos carregados.`;
             searchInput.disabled = false;
             searchInput.focus();
         }
@@ -290,8 +316,7 @@
             const terms = limparTexto(query).split(' ').filter(t => t.length > 0);
 
             const filtered = productsData.filter(item => {
-                // --- NOVA LÓGICA DE FILTRO ---
-                // Criamos um texto apenas com os valores das colunas 'Codigo' ou 'Produto'
+                // FILTRO INTELIGENTE: Só olha Código e Produto
                 let textoParaBusca = "";
                 headers.forEach(h => {
                     const hLimpo = limparTexto(h);
