@@ -176,7 +176,7 @@
         // CONFIGURAÇÃO: COLE SEU LINK COM PROXY ABAIXO
         // Exemplo: "https://corsproxy.io/?https://docs.google.com/..."
         // =================================================================
-        const LINK_DA_PLANILHA = ""; 
+        const LINK_DA_PLANILHA = "https://corsproxy.io/?https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv"; 
         const SENHA_MESTRE = "1234";
         // =================================================================
 
