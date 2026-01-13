@@ -6,7 +6,9 @@
     <title>Pesquisa de Produtos</title>
     
     <link rel="icon" href="logo.png" type="image/png">
-    <link rel="apple-touch-icon" href="logo.png"> <style>
+    <link rel="apple-touch-icon" href="logo.png">
+
+    <style>
         :root {
             --main-color: #00579D; 
             --bg-light: #f1f3f4;
@@ -185,16 +187,13 @@
 
     <div class="header-container">
         <h1>Pesquisa de Produtos</h1>
-        
         <div id="dataDisplay" class="date-subtitle"></div>
-
         <img src="topo.jpg" alt="Imagem do Topo" class="top-image" onerror="this.style.display='none'">
-        
         <div class="loader" id="loader"></div>
         <div id="status" class="status-msg">Conectando à planilha...</div>
     </div>
 
-    <div class="search-container" id="searchArea">
+    <div class="search-container">
         <input type="text" id="searchInput" class="search-box" placeholder="Pesquisar por Código ou Produto..." disabled>
     </div>
 
@@ -213,12 +212,8 @@
         // =================================================================
         // CONFIGURAÇÃO
         // =================================================================
-        
-        // COLE SEU LINK COM O PROXY AQUI:
         const LINK_DA_PLANILHA = "https://corsproxy.io/?https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv"; 
-        
         const SENHA_MESTRE = "1234";
-
         // =================================================================
 
         let productsData = [];
@@ -244,28 +239,17 @@
 
         function loadCSV() {
             loader.style.display = 'block';
-            statusMsg.innerText = "Sincronizando dados...";
-
             fetch(LINK_DA_PLANILHA)
-                .then(response => {
-                    if (!response.ok) throw new Error("Erro ao acessar planilha.");
-                    return response.arrayBuffer(); 
-                })
+                .then(response => response.arrayBuffer())
                 .then(buffer => {
                     const decoder = new TextDecoder('utf-8'); 
-                    const text = decoder.decode(buffer);
-                    parseCSV(text);
-
-                    const dataHoje = new Date().toLocaleString('pt-BR', {
-                        day: '2-digit', month: '2-digit', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit'
-                    });
+                    parseCSV(decoder.decode(buffer));
+                    const dataHoje = new Date().toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
                     dataDisplay.innerText = "Sincronizado com o Drive em: " + dataHoje;
                 })
                 .catch(error => {
-                    console.error("Erro:", error);
                     loader.style.display = 'none';
-                    statusMsg.innerText = "Erro ao carregar. Verifique o link.";
+                    statusMsg.innerText = "Erro ao carregar dados.";
                     statusMsg.style.color = "red";
                 });
         }
@@ -273,17 +257,13 @@
         function parseCSV(text) {
             const lines = text.split('\n').filter(line => line.trim() !== '');
             if (lines.length === 0) return;
-
-            const firstLine = lines[0];
-            const separator = firstLine.includes(';') ? ';' : ','; 
-            headers = firstLine.split(separator).map(h => h.trim());
-            
+            const separator = lines[0].includes(';') ? ';' : ','; 
+            headers = lines[0].split(separator).map(h => h.trim());
             const vocabularySet = new Set();
 
             productsData = lines.slice(1).map(line => {
                 const regex = new RegExp(`(?:${separator}|\\r?\\n|^)(?:"([^"]*)"|([^"${separator}\\r\\n]*))`, 'gi');
-                let matches = [];
-                let matched;
+                let matches = [], matched;
                 while (matched = regex.exec(line)) {
                     let val = matched[1] ? matched[1] : matched[2];
                     matches.push(val ? val.trim() : "");
@@ -291,26 +271,18 @@
                 let obj = {};
                 headers.forEach((header, index) => {
                     let val = matches[index] || "";
-                    if (val.startsWith('"') && val.endsWith('"')) val = val.substring(1, val.length - 1);
                     obj[header] = val;
-
                     if (header.toLowerCase().includes("produto")) {
-                        const palavras = limparTexto(val).split(' ');
-                        palavras.forEach(p => {
-                            if(p.length > 2) vocabularySet.add(p); 
-                        });
+                        limparTexto(val).split(' ').forEach(p => { if(p.length > 2) vocabularySet.add(p); });
                     }
                 });
                 return obj;
             });
-
             allWordsVocabulary = Array.from(vocabularySet);
-
             setupTableHeaders();
             loader.style.display = 'none';
             statusMsg.innerText = `${productsData.length} produtos carregados.`;
             searchInput.disabled = false;
-            searchInput.focus();
         }
 
         function setupTableHeaders() {
@@ -328,53 +300,26 @@
             return texto.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
         }
 
+        // Algoritmo de Levenshtein para sugestão
         function levenshtein(a, b) {
             const matrix = [];
             for (let i = 0; i <= b.length; i++) matrix[i] = [i];
             for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-
             for (let i = 1; i <= b.length; i++) {
                 for (let j = 1; j <= a.length; j++) {
-                    if (b.charAt(i - 1) == a.charAt(j - 1)) {
-                        matrix[i][j] = matrix[i - 1][j - 1];
-                    } else {
-                        matrix[i][j] = Math.min(
-                            matrix[i - 1][j - 1] + 1, 
-                            Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)
-                        );
-                    }
+                    matrix[i][j] = b[i-1] == a[j-1] ? matrix[i-1][j-1] : Math.min(matrix[i-1][j-1]+1, matrix[i][j-1]+1, matrix[i-1][j]+1);
                 }
             }
             return matrix[b.length][a.length];
         }
 
-        function buscarSugestao(termoDigitado) {
-            let melhorPalavra = termoDigitado;
-            let menorDistancia = Infinity;
-
-            allWordsVocabulary.forEach(palavraDoVocabulario => {
-                const dist = levenshtein(termoDigitado, palavraDoVocabulario);
-                if (dist < menorDistancia && dist <= 2 && Math.abs(palavraDoVocabulario.length - termoDigitado.length) < 3) {
-                    menorDistancia = dist;
-                    melhorPalavra = palavraDoVocabulario;
-                }
+        function buscarSugestao(termo) {
+            let melhor = null, menorDist = 3;
+            allWordsVocabulary.forEach(palavra => {
+                const dist = levenshtein(termo, palavra);
+                if (dist < menorDist) { menorDist = dist; melhor = palavra; }
             });
-
-            if (menorDistancia > 0 && menorDistancia <= 2) {
-                return melhorPalavra;
-            }
-            return null;
-        }
-
-        function tentarDesbloquear() {
-            if (custoLiberado) return; 
-            const senhaDigitada = prompt("Senha para custos:");
-            if (senhaDigitada === SENHA_MESTRE) {
-                custoLiberado = true;
-                filterData(searchInput.value); 
-            } else {
-                alert("Senha incorreta.");
-            }
+            return melhor;
         }
 
         searchInput.addEventListener('keyup', (e) => {
@@ -383,56 +328,45 @@
         });
 
         suggestionLink.addEventListener('click', function() {
-            const novoTermo = this.innerText;
-            searchInput.value = novoTermo;
+            searchInput.value = this.innerText;
             suggestionBox.style.display = 'none';
-            filterData(novoTermo);
+            filterData(this.innerText);
         });
 
         function filterData(query) {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = ''; 
-
             if (query.length === 0) {
                  statusMsg.innerText = `${productsData.length} itens disponíveis.`;
-                 suggestionBox.style.display = 'none';
                  return;
             }
 
-            const termsRaw = query.split(' ').filter(t => t.length > 0);
-            const termsClean = termsRaw.map(t => limparTexto(t));
+            const termsClean = limparTexto(query).split(' ').filter(t => t.length > 0);
 
             const filtered = productsData.filter(item => {
-                let textoParaBusca = "";
+                // Pega o conteúdo das colunas alvo
+                let alvos = [];
                 headers.forEach(h => {
-                    const hLimpo = limparTexto(h);
-                    if (hLimpo === "codigo" || hLimpo === "produto") {
-                        textoParaBusca += " " + item[h];
-                    }
+                    const hl = h.toLowerCase();
+                    if (hl === "codigo" || hl === "produto") alvos.push(limparTexto(item[h]));
                 });
-                const itemTextoLimpo = limparTexto(textoParaBusca);
-                return termsClean.every(term => itemTextoLimpo.includes(term));
+
+                // Lógica: Cada termo digitado deve ser o INÍCIO de alguma palavra no produto/código
+                return termsClean.every(term => {
+                    return alvos.some(textoAlvo => {
+                        const palavrasNoItem = textoAlvo.split(' ');
+                        // Verifica se alguma palavra do item começa com o termo digitado
+                        return palavrasNoItem.some(p => p.startsWith(term));
+                    });
+                });
             });
 
             if (filtered.length === 0) {
-                let sugeriuAlgo = false;
-                let novaFrase = [];
-
-                termsClean.forEach(termo => {
-                    const sugestao = buscarSugestao(termo);
-                    if (sugestao) {
-                        novaFrase.push(sugestao);
-                        sugeriuAlgo = true;
-                    } else {
-                        novaFrase.push(termo);
-                    }
-                });
-
-                if (sugeriuAlgo) {
-                    suggestionLink.innerText = novaFrase.join(' ');
+                let novaFrase = termsClean.map(t => buscarSugestao(t) || t).join(' ');
+                if(novaFrase !== termsClean.join(' ')) {
+                    suggestionLink.innerText = novaFrase;
                     suggestionBox.style.display = 'block';
                 }
-
                 statusMsg.innerText = "Nenhum resultado encontrado.";
                 return;
             }
@@ -448,7 +382,9 @@
                         } else {
                             td.innerHTML = "🔒 Ver";
                             td.classList.add("locked-cell");
-                            td.onclick = tentarDesbloquear; 
+                            td.onclick = () => {
+                                if(prompt("Senha:") === SENHA_MESTRE) { custoLiberado = true; filterData(searchInput.value); }
+                            }; 
                         }
                     } else {
                         td.innerText = item[header];
@@ -457,7 +393,6 @@
                 });
                 tbody.appendChild(tr);
             });
-             
             statusMsg.innerText = `${filtered.length} resultados encontrados.`;
         }
     </script>
