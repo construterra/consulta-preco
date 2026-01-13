@@ -190,7 +190,7 @@
         <div id="dataDisplay" class="date-subtitle"></div>
         <img src="topo.jpg" alt="Imagem do Topo" class="top-image" onerror="this.style.display='none'">
         <div class="loader" id="loader"></div>
-        <div id="status" class="status-msg">Conectando à planilha...</div>
+        <div id="status" class="status-msg">Conectando...</div>
     </div>
 
     <div class="search-container">
@@ -212,7 +212,7 @@
         // =================================================================
         // CONFIGURAÇÃO
         // =================================================================
-        const LINK_DA_PLANILHA = "https://corsproxy.io/?https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv"; 
+        const LINK_DA_PLANILHA = "https://corsproxy.io/?https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv"; // COLE O LINK COM PROXY AQUI
         const SENHA_MESTRE = "1234";
         // =================================================================
 
@@ -230,8 +230,7 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             if (LINK_DA_PLANILHA === "") {
-                statusMsg.innerText = "ERRO: Link da planilha não configurado.";
-                statusMsg.style.color = "red";
+                statusMsg.innerText = "ERRO: Link não configurado.";
                 return;
             }
             loadCSV();
@@ -245,12 +244,11 @@
                     const decoder = new TextDecoder('utf-8'); 
                     parseCSV(decoder.decode(buffer));
                     const dataHoje = new Date().toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
-                    dataDisplay.innerText = "Sincronizado com o Drive em: " + dataHoje;
+                    dataDisplay.innerText = "Sincronizado em: " + dataHoje;
                 })
                 .catch(error => {
                     loader.style.display = 'none';
                     statusMsg.innerText = "Erro ao carregar dados.";
-                    statusMsg.style.color = "red";
                 });
         }
 
@@ -281,7 +279,7 @@
             allWordsVocabulary = Array.from(vocabularySet);
             setupTableHeaders();
             loader.style.display = 'none';
-            statusMsg.innerText = `${productsData.length} produtos carregados.`;
+            statusMsg.innerText = `${productsData.length} itens disponíveis.`;
             searchInput.disabled = false;
         }
 
@@ -322,7 +320,7 @@
             return melhor;
         }
 
-        searchInput.addEventListener('keyup', (e) => {
+        searchInput.addEventListener('input', (e) => {
             suggestionBox.style.display = 'none';
             filterData(e.target.value);
         });
@@ -336,7 +334,7 @@
         function filterData(query) {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = ''; 
-            if (query.length === 0) {
+            if (query.trim().length === 0) {
                  statusMsg.innerText = `${productsData.length} itens disponíveis.`;
                  return;
             }
@@ -344,20 +342,24 @@
             const termsClean = limparTexto(query).split(' ').filter(t => t.length > 0);
 
             const filtered = productsData.filter(item => {
-                // Pega o conteúdo das colunas alvo
-                let alvos = [];
-                headers.forEach(h => {
-                    const hl = h.toLowerCase();
-                    if (hl === "codigo" || hl === "produto") alvos.push(limparTexto(item[h]));
-                });
-
-                // Lógica: Cada termo digitado deve ser o INÍCIO de alguma palavra no produto/código
+                // Checa cada termo da pesquisa
                 return termsClean.every(term => {
-                    return alvos.some(textoAlvo => {
-                        const palavrasNoItem = textoAlvo.split(' ');
-                        // Verifica se alguma palavra do item começa com o termo digitado
-                        return palavrasNoItem.some(p => p.startsWith(term));
+                    // O termo deve bater com o INÍCIO de alguma palavra no Código ou no Produto
+                    let matchFound = false;
+                    
+                    headers.forEach(h => {
+                        const hl = h.toLowerCase();
+                        if (hl === "codigo" || hl === "produto") {
+                            const textoDaColuna = limparTexto(item[h]);
+                            const palavrasDaColuna = textoDaColuna.split(/\s+/); // divide por espaços
+                            
+                            // Verifica se alguma palavra começa com o termo
+                            if (palavrasDaColuna.some(p => p.startsWith(term))) {
+                                matchFound = true;
+                            }
+                        }
                     });
+                    return matchFound;
                 });
             });
 
@@ -367,7 +369,7 @@
                     suggestionLink.innerText = novaFrase;
                     suggestionBox.style.display = 'block';
                 }
-                statusMsg.innerText = "Nenhum resultado encontrado.";
+                statusMsg.innerText = "Nenhum resultado.";
                 return;
             }
 
@@ -393,7 +395,7 @@
                 });
                 tbody.appendChild(tr);
             });
-            statusMsg.innerText = `${filtered.length} resultados encontrados.`;
+            statusMsg.innerText = `${filtered.length} encontrados.`;
         }
     </script>
 </body>
