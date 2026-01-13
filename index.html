@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pesquisa de Produtos</title>
-    <style>
+    
+    <link rel="icon" href="logo.png" type="image/png">
+    <link rel="apple-touch-icon" href="logo.png"> <style>
         :root {
             --main-color: #00579D; 
             --bg-light: #f1f3f4;
@@ -64,7 +66,7 @@
             max-width: 600px;
             position: relative;
             display: block; 
-            margin-bottom: 10px; /* Reduzi margem para caber a sugestão */
+            margin-bottom: 10px;
         }
 
         .search-box {
@@ -84,15 +86,14 @@
             border-color: var(--main-color);
         }
 
-        /* ESTILO DA SUGESTÃO "VOCÊ QUIS DIZER" */
         .suggestion-box {
             text-align: left;
             width: 100%;
             max-width: 600px;
             margin-bottom: 15px;
             font-size: 16px;
-            color: #cc0000; /* Vermelho padrão de erro/correção */
-            display: none; /* Escondido por padrão */
+            color: #cc0000; 
+            display: none; 
             padding-left: 15px;
         }
         
@@ -222,7 +223,7 @@
 
         let productsData = [];
         let headers = [];
-        let allWordsVocabulary = []; // Lista de todas as palavras da tabela
+        let allWordsVocabulary = []; 
         let custoLiberado = false; 
 
         const searchInput = document.getElementById('searchInput');
@@ -277,7 +278,6 @@
             const separator = firstLine.includes(';') ? ';' : ','; 
             headers = firstLine.split(separator).map(h => h.trim());
             
-            // Set para guardar palavras únicas (para a correção ortográfica)
             const vocabularySet = new Set();
 
             productsData = lines.slice(1).map(line => {
@@ -294,18 +294,16 @@
                     if (val.startsWith('"') && val.endsWith('"')) val = val.substring(1, val.length - 1);
                     obj[header] = val;
 
-                    // Constrói o vocabulário baseado na coluna PRODUTO
                     if (header.toLowerCase().includes("produto")) {
                         const palavras = limparTexto(val).split(' ');
                         palavras.forEach(p => {
-                            if(p.length > 2) vocabularySet.add(p); // Só palavras > 2 letras
+                            if(p.length > 2) vocabularySet.add(p); 
                         });
                     }
                 });
                 return obj;
             });
 
-            // Converte o Set para Array para usarmos na busca
             allWordsVocabulary = Array.from(vocabularySet);
 
             setupTableHeaders();
@@ -330,11 +328,6 @@
             return texto.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
         }
 
-        // ============================================================
-        // SISTEMA DE CORREÇÃO DE PALAVRAS (Fuzzy Logic)
-        // ============================================================
-        
-        // Algoritmo de Levenshtein (Distância entre palavras)
         function levenshtein(a, b) {
             const matrix = [];
             for (let i = 0; i <= b.length; i++) matrix[i] = [i];
@@ -361,22 +354,17 @@
 
             allWordsVocabulary.forEach(palavraDoVocabulario => {
                 const dist = levenshtein(termoDigitado, palavraDoVocabulario);
-                
-                // Regra: A distância deve ser pequena (máximo 2 erros) e a diferença de tamanho pequena
                 if (dist < menorDistancia && dist <= 2 && Math.abs(palavraDoVocabulario.length - termoDigitado.length) < 3) {
                     menorDistancia = dist;
                     melhorPalavra = palavraDoVocabulario;
                 }
             });
 
-            // Só sugere se achou algo melhor e diferente do que foi digitado
             if (menorDistancia > 0 && menorDistancia <= 2) {
                 return melhorPalavra;
             }
             return null;
         }
-
-        // ============================================================
 
         function tentarDesbloquear() {
             if (custoLiberado) return; 
@@ -390,12 +378,10 @@
         }
 
         searchInput.addEventListener('keyup', (e) => {
-            // Esconde sugestão ao digitar
             suggestionBox.style.display = 'none';
             filterData(e.target.value);
         });
 
-        // Clique na sugestão "Você quis dizer..."
         suggestionLink.addEventListener('click', function() {
             const novoTermo = this.innerText;
             searchInput.value = novoTermo;
@@ -428,7 +414,6 @@
                 return termsClean.every(term => itemTextoLimpo.includes(term));
             });
 
-            // SE NÃO ACHOU NADA, TENTA SUGERIR CORREÇÃO
             if (filtered.length === 0) {
                 let sugeriuAlgo = false;
                 let novaFrase = [];
@@ -452,7 +437,6 @@
                 return;
             }
 
-            // Se achou resultados, exibe normalmente
             filtered.slice(0, 500).forEach(item => {
                 const tr = document.createElement('tr');
                 headers.forEach(header => {
