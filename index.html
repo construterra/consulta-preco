@@ -11,6 +11,7 @@
             --border-color: #dfe1e5;
             --locked-color: #777;
             --text-gray: #666;
+            --link-blue: #1a0dab;
         }
 
         body {
@@ -37,12 +38,11 @@
         h1 {
             color: var(--main-color);
             font-size: 3rem;
-            margin-bottom: 5px; /* Reduzi margem para colar no subtitulo */
+            margin-bottom: 5px; 
             margin-top: 0;
             letter-spacing: -1px;
         }
 
-        /* ESTILO DA DATA (NOVO) */
         .date-subtitle {
             font-size: 1rem;
             color: var(--text-gray);
@@ -64,7 +64,7 @@
             max-width: 600px;
             position: relative;
             display: block; 
-            margin-bottom: 20px;
+            margin-bottom: 10px; /* Reduzi margem para caber a sugestão */
         }
 
         .search-box {
@@ -82,6 +82,26 @@
         .search-box:focus {
             box-shadow: 0 4px 12px rgba(32,33,36,.3);
             border-color: var(--main-color);
+        }
+
+        /* ESTILO DA SUGESTÃO "VOCÊ QUIS DIZER" */
+        .suggestion-box {
+            text-align: left;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #cc0000; /* Vermelho padrão de erro/correção */
+            display: none; /* Escondido por padrão */
+            padding-left: 15px;
+        }
+        
+        .suggestion-link {
+            color: var(--link-blue);
+            font-weight: bold;
+            font-style: italic;
+            cursor: pointer;
+            text-decoration: underline;
         }
 
         .status-msg {
@@ -177,6 +197,10 @@
         <input type="text" id="searchInput" class="search-box" placeholder="Pesquisar por Código ou Produto..." disabled>
     </div>
 
+    <div id="suggestionBox" class="suggestion-box">
+        Você quis dizer: <span id="suggestionLink" class="suggestion-link"></span>?
+    </div>
+
     <div class="results-container">
         <table id="dataTable">
             <thead><tr id="tableHeader"></tr></thead>
@@ -198,11 +222,15 @@
 
         let productsData = [];
         let headers = [];
+        let allWordsVocabulary = []; // Lista de todas as palavras da tabela
         let custoLiberado = false; 
+
         const searchInput = document.getElementById('searchInput');
         const statusMsg = document.getElementById('status');
         const loader = document.getElementById('loader');
         const dataDisplay = document.getElementById('dataDisplay');
+        const suggestionBox = document.getElementById('suggestionBox');
+        const suggestionLink = document.getElementById('suggestionLink');
 
         window.addEventListener('DOMContentLoaded', () => {
             if (LINK_DA_PLANILHA === "") {
@@ -223,13 +251,10 @@
                     return response.arrayBuffer(); 
                 })
                 .then(buffer => {
-                    // Decodifica e Processa
                     const decoder = new TextDecoder('utf-8'); 
                     const text = decoder.decode(buffer);
                     parseCSV(text);
 
-                    // ATUALIZA A DATA VISUAL
-                    // Pega a data de agora formatada para o padrão brasileiro
                     const dataHoje = new Date().toLocaleString('pt-BR', {
                         day: '2-digit', month: '2-digit', year: 'numeric',
                         hour: '2-digit', minute: '2-digit'
@@ -252,6 +277,9 @@
             const separator = firstLine.includes(';') ? ';' : ','; 
             headers = firstLine.split(separator).map(h => h.trim());
             
+            // Set para guardar palavras únicas (para a correção ortográfica)
+            const vocabularySet = new Set();
+
             productsData = lines.slice(1).map(line => {
                 const regex = new RegExp(`(?:${separator}|\\r?\\n|^)(?:"([^"]*)"|([^"${separator}\\r\\n]*))`, 'gi');
                 let matches = [];
@@ -265,9 +293,20 @@
                     let val = matches[index] || "";
                     if (val.startsWith('"') && val.endsWith('"')) val = val.substring(1, val.length - 1);
                     obj[header] = val;
+
+                    // Constrói o vocabulário baseado na coluna PRODUTO
+                    if (header.toLowerCase().includes("produto")) {
+                        const palavras = limparTexto(val).split(' ');
+                        palavras.forEach(p => {
+                            if(p.length > 2) vocabularySet.add(p); // Só palavras > 2 letras
+                        });
+                    }
                 });
                 return obj;
             });
+
+            // Converte o Set para Array para usarmos na busca
+            allWordsVocabulary = Array.from(vocabularySet);
 
             setupTableHeaders();
             loader.style.display = 'none';
@@ -291,6 +330,54 @@
             return texto.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
         }
 
+        // ============================================================
+        // SISTEMA DE CORREÇÃO DE PALAVRAS (Fuzzy Logic)
+        // ============================================================
+        
+        // Algoritmo de Levenshtein (Distância entre palavras)
+        function levenshtein(a, b) {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+            for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) == a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1, 
+                            Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)
+                        );
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function buscarSugestao(termoDigitado) {
+            let melhorPalavra = termoDigitado;
+            let menorDistancia = Infinity;
+
+            allWordsVocabulary.forEach(palavraDoVocabulario => {
+                const dist = levenshtein(termoDigitado, palavraDoVocabulario);
+                
+                // Regra: A distância deve ser pequena (máximo 2 erros) e a diferença de tamanho pequena
+                if (dist < menorDistancia && dist <= 2 && Math.abs(palavraDoVocabulario.length - termoDigitado.length) < 3) {
+                    menorDistancia = dist;
+                    melhorPalavra = palavraDoVocabulario;
+                }
+            });
+
+            // Só sugere se achou algo melhor e diferente do que foi digitado
+            if (menorDistancia > 0 && menorDistancia <= 2) {
+                return melhorPalavra;
+            }
+            return null;
+        }
+
+        // ============================================================
+
         function tentarDesbloquear() {
             if (custoLiberado) return; 
             const senhaDigitada = prompt("Senha para custos:");
@@ -302,7 +389,19 @@
             }
         }
 
-        searchInput.addEventListener('keyup', (e) => filterData(e.target.value));
+        searchInput.addEventListener('keyup', (e) => {
+            // Esconde sugestão ao digitar
+            suggestionBox.style.display = 'none';
+            filterData(e.target.value);
+        });
+
+        // Clique na sugestão "Você quis dizer..."
+        suggestionLink.addEventListener('click', function() {
+            const novoTermo = this.innerText;
+            searchInput.value = novoTermo;
+            suggestionBox.style.display = 'none';
+            filterData(novoTermo);
+        });
 
         function filterData(query) {
             const tbody = document.getElementById('tableBody');
@@ -310,13 +409,14 @@
 
             if (query.length === 0) {
                  statusMsg.innerText = `${productsData.length} itens disponíveis.`;
+                 suggestionBox.style.display = 'none';
                  return;
             }
 
-            const terms = limparTexto(query).split(' ').filter(t => t.length > 0);
+            const termsRaw = query.split(' ').filter(t => t.length > 0);
+            const termsClean = termsRaw.map(t => limparTexto(t));
 
             const filtered = productsData.filter(item => {
-                // FILTRO INTELIGENTE: Só olha Código e Produto
                 let textoParaBusca = "";
                 headers.forEach(h => {
                     const hLimpo = limparTexto(h);
@@ -324,16 +424,35 @@
                         textoParaBusca += " " + item[h];
                     }
                 });
-                
                 const itemTextoLimpo = limparTexto(textoParaBusca);
-                return terms.every(term => itemTextoLimpo.includes(term));
+                return termsClean.every(term => itemTextoLimpo.includes(term));
             });
 
+            // SE NÃO ACHOU NADA, TENTA SUGERIR CORREÇÃO
             if (filtered.length === 0) {
-                 statusMsg.innerText = "Nenhum resultado encontrado.";
-                 return;
+                let sugeriuAlgo = false;
+                let novaFrase = [];
+
+                termsClean.forEach(termo => {
+                    const sugestao = buscarSugestao(termo);
+                    if (sugestao) {
+                        novaFrase.push(sugestao);
+                        sugeriuAlgo = true;
+                    } else {
+                        novaFrase.push(termo);
+                    }
+                });
+
+                if (sugeriuAlgo) {
+                    suggestionLink.innerText = novaFrase.join(' ');
+                    suggestionBox.style.display = 'block';
+                }
+
+                statusMsg.innerText = "Nenhum resultado encontrado.";
+                return;
             }
 
+            // Se achou resultados, exibe normalmente
             filtered.slice(0, 500).forEach(item => {
                 const tr = document.createElement('tr');
                 headers.forEach(header => {
