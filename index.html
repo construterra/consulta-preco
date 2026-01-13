@@ -298,7 +298,6 @@
             return texto.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
         }
 
-        // Algoritmo de Levenshtein para sugestão
         function levenshtein(a, b) {
             const matrix = [];
             for (let i = 0; i <= b.length; i++) matrix[i] = [i];
@@ -342,29 +341,33 @@
             const termsClean = limparTexto(query).split(' ').filter(t => t.length > 0);
 
             const filtered = productsData.filter(item => {
-                // Checa cada termo da pesquisa
+                // Para cada termo da pesquisa (ex: "bomba", "0318")...
                 return termsClean.every(term => {
-                    // O termo deve bater com o INÍCIO de alguma palavra no Código ou no Produto
-                    let matchFound = false;
-                    
+                    let matchNoItem = false;
+
                     headers.forEach(h => {
                         const hl = h.toLowerCase();
                         if (hl === "codigo" || hl === "produto") {
-                            const textoDaColuna = limparTexto(item[h]);
-                            const palavrasDaColuna = textoDaColuna.split(/\s+/); // divide por espaços
+                            const valorOriginal = item[h];
+                            const valorLimpo = limparTexto(valorOriginal);
                             
-                            // Verifica se alguma palavra começa com o termo
-                            if (palavrasDaColuna.some(p => p.startsWith(term))) {
-                                matchFound = true;
+                            // 1. Se o termo for numérico, aceita em qualquer parte (contains)
+                            if (!isNaN(term)) {
+                                if (valorLimpo.includes(term)) matchNoItem = true;
+                            } 
+                            // 2. Se for texto, verifica se alguma palavra começa com o termo
+                            else {
+                                const palavras = valorLimpo.split(/\s+/);
+                                if (palavras.some(p => p.startsWith(term))) matchNoItem = true;
                             }
                         }
                     });
-                    return matchFound;
+                    return matchNoItem;
                 });
             });
 
             if (filtered.length === 0) {
-                let novaFrase = termsClean.map(t => buscarSugestao(t) || t).join(' ');
+                let novaFrase = termsClean.map(t => (isNaN(t) ? buscarSugestao(t) : null) || t).join(' ');
                 if(novaFrase !== termsClean.join(' ')) {
                     suggestionLink.innerText = novaFrase;
                     suggestionBox.style.display = 'block';
