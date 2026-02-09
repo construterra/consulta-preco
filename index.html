@@ -1,13 +1,112 @@
-// --- CONFIGURAÇÃO OTIMIZADA ---
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pesquisa de Produtos - Construterra</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+
+    <style>
+        :root { --main-color: #00579D; --bg-light: #f1f3f4; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; background-color: #fff; }
+        .header-container { text-align: center; margin-top: 40px; width: 100%; max-width: 800px; padding: 0 20px; }
+        h1 { color: var(--main-color); font-size: 2.5rem; margin: 0; }
+        .search-container { width: 100%; max-width: 600px; margin-top: 20px; }
+        .search-box { width: 100%; padding: 14px 25px; font-size: 18px; border: 1px solid #dfe1e5; border-radius: 30px; outline: none; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .results-container { width: 95%; max-width: 1200px; margin-top: 20px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid #e0e0e0; }
+        thead { background-color: var(--main-color); color: white; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; white-space: nowrap; }
+        .status-msg { margin-top: 10px; color: #666; font-size: 0.9rem; }
+        .error-log { color: #d32f2f; font-size: 0.85rem; margin-top: 10px; background: #fff0f0; padding: 10px; border-radius: 4px; display: none; border: 1px solid #ffcdd2; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--main-color); border-radius: 50%; width: 25px; height: 25px; animation: spin 1s linear infinite; margin: 10px auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .unlocked { color: #d32f2f; font-weight: bold; }
+        .locked { cursor: pointer; color: #555; background: #eee; text-align: center; font-weight: bold; }
+        .btn-retry { background-color: var(--main-color); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <h1>Pesquisa de Produtos</h1>
+        <img src="topo.jpg" style="max-width:100%; height:auto; max-height:100px; margin-top:10px;" onerror="this.style.display='none'">
+        
+        <div class="loader" id="loader"></div>
+        <div id="status" class="status-msg">Iniciando...</div>
+        
+        <div id="errorLog" class="error-log"></div>
+        <button id="btnRetry" class="btn-retry" style="display:none;" onclick="location.reload(true);">🔄 Recarregar</button>
+    </div>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" class="search-box" placeholder="Carregando dados..." disabled>
+    </div>
+
+    <div class="results-container">
+        <table id="dataTable">
+            <thead><tr id="tableHeader"></tr></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURAÇÃO OTIMIZADA
+        // ==========================================
         const PLANILHA_ID = "2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg";
         const GID = "349719770";
         const SENHA_MESTRE = "1234";
 
         const URL_GOOGLE = `https://docs.google.com/spreadsheets/d/e/${PLANILHA_ID}/pub?gid=${GID}&single=true&output=csv`;
 
-        // INVERTEMOS A ORDEM: Agora a Direta é a primeira!
+        // Ordem de tentativa: Direto -> AllOrigins -> ThingProxy
         const PROXIES = [
-            "",                                           // Opção 1: Direto (Rápido)
-            "https://api.allorigins.win/raw?url=",        // Opção 2: Backup AllOrigins
-            "https://thingproxy.freeboard.io/fetch/"      // Opção 3: Backup ThingProxy
+            "", 
+            "https://api.allorigins.win/raw?url=", 
+            "https://thingproxy.freeboard.io/fetch/"
         ];
+
+        let tentativaAtual = 0;
+        let productsData = [];
+        let headers = [];
+        let custoLiberado = false;
+
+        const statusMsg = document.getElementById('status');
+        const errorLog = document.getElementById('errorLog');
+        const loader = document.getElementById('loader');
+        const searchInput = document.getElementById('searchInput');
+        const btnRetry = document.getElementById('btnRetry');
+
+        window.onload = carregarDados;
+
+        function carregarDados() {
+            loader.style.display = 'block';
+            errorLog.style.display = 'none';
+            btnRetry.style.display = 'none';
+            
+            let proxyUsado = PROXIES[tentativaAtual];
+            let urlFinal = proxyUsado === "" ? URL_GOOGLE : proxyUsado + encodeURIComponent(URL_GOOGLE);
+            
+            statusMsg.innerText = proxyUsado === "" ? "Conectando diretamente ao Google..." : `Tentando via servidor reserva ${tentativaAtual}...`;
+
+            Papa.parse(urlFinal, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                encoding: "UTF-8",
+                complete: function(results) {
+                    loader.style.display = 'none';
+                    if (results.data && results.data.length > 0) {
+                        productsData = results.data;
+                        headers = results.meta.fields;
+                        montarCabecalho();
+                        statusMsg.innerText = `✅ ${productsData.length} produtos prontos.`;
+                        searchInput.disabled = false;
+                        searchInput.placeholder = "Digite o código ou nome do produto...";
+                        searchInput.focus();
+                    } else {
+                        lidarComErro("Dados vazios recebidos.");
+                    }
