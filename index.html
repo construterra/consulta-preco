@@ -188,7 +188,7 @@
     <div class="header-container">
         <h1>Pesquisa de Produtos</h1>
         <div id="dataDisplay" class="date-subtitle"></div>
-        <img src="topo.jpg" alt="Imagem do Topo" class="top-image" onerror="this.style.display='none'">
+        <img src="topo.jpg" alt="Logo Topo" class="top-image" onerror="this.style.display='none'">
         <div class="loader" id="loader"></div>
         <div id="status" class="status-msg">Conectando...</div>
     </div>
@@ -212,8 +212,12 @@
         // =================================================================
         // CONFIGURAÇÃO
         // =================================================================
-        const LINK_DA_PLANILHA = "https://corsproxy.io/?https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv"; // COLE O LINK COM PROXY AQUI
+        
+        // Link fornecido já com o Proxy AllOrigins embutido
+        const LINK_DA_PLANILHA = "https://api.allorigins.win/raw?url=https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv";
+        
         const SENHA_MESTRE = "1234";
+
         // =================================================================
 
         let productsData = [];
@@ -229,34 +233,36 @@
         const suggestionLink = document.getElementById('suggestionLink');
 
         window.addEventListener('DOMContentLoaded', () => {
-            if (LINK_DA_PLANILHA === "") {
-                statusMsg.innerText = "ERRO: Link não configurado.";
-                return;
-            }
             loadCSV();
         });
 
         function loadCSV() {
             loader.style.display = 'block';
             fetch(LINK_DA_PLANILHA)
-                .then(response => response.arrayBuffer())
-                .then(buffer => {
-                    const decoder = new TextDecoder('utf-8'); 
-                    parseCSV(decoder.decode(buffer));
-                    const dataHoje = new Date().toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+                .then(response => {
+                    if (!response.ok) throw new Error("Falha na conexão");
+                    return response.text();
+                })
+                .then(text => {
+                    parseCSV(text);
+                    const dataHoje = new Date().toLocaleString('pt-BR');
                     dataDisplay.innerText = "Sincronizado em: " + dataHoje;
                 })
                 .catch(error => {
                     loader.style.display = 'none';
-                    statusMsg.innerText = "Erro ao carregar dados.";
+                    statusMsg.innerText = "Erro ao carregar dados. Verifique a internet.";
+                    statusMsg.style.color = "red";
+                    console.error(error);
                 });
         }
 
         function parseCSV(text) {
             const lines = text.split('\n').filter(line => line.trim() !== '');
             if (lines.length === 0) return;
+
             const separator = lines[0].includes(';') ? ';' : ','; 
             headers = lines[0].split(separator).map(h => h.trim());
+            
             const vocabularySet = new Set();
 
             productsData = lines.slice(1).map(line => {
@@ -270,20 +276,19 @@
                 headers.forEach((header, index) => {
                     let val = matches[index] || "";
                     obj[header] = val;
+
+                    // Alimenta o vocabulário para sugestões (apenas da coluna Produto)
                     if (header.toLowerCase().includes("produto")) {
-                        limparTexto(val).split(' ').forEach(p => { if(p.length > 2) vocabularySet.add(p); });
+                        limparTexto(val).split(' ').forEach(p => {
+                            if(p.length > 2) vocabularySet.add(p); 
+                        });
                     }
                 });
                 return obj;
             });
-            allWordsVocabulary = Array.from(vocabularySet);
-            setupTableHeaders();
-            loader.style.display = 'none';
-            statusMsg.innerText = `${productsData.length} itens disponíveis.`;
-            searchInput.disabled = false;
-        }
 
-        function setupTableHeaders() {
+            allWordsVocabulary = Array.from(vocabularySet);
+
             const tr = document.getElementById('tableHeader');
             tr.innerHTML = '';
             headers.forEach(header => {
@@ -291,6 +296,11 @@
                 th.innerText = header;
                 tr.appendChild(th);
             });
+
+            loader.style.display = 'none';
+            statusMsg.innerText = `${productsData.length} itens disponíveis.`;
+            searchInput.disabled = false;
+            searchInput.focus();
         }
 
         function limparTexto(texto) {
@@ -298,6 +308,7 @@
             return texto.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
         }
 
+        // Sugestão "Você quis dizer" (Levenshtein)
         function levenshtein(a, b) {
             const matrix = [];
             for (let i = 0; i <= b.length; i++) matrix[i] = [i];
@@ -341,24 +352,17 @@
             const termsClean = limparTexto(query).split(' ').filter(t => t.length > 0);
 
             const filtered = productsData.filter(item => {
-                // Para cada termo da pesquisa (ex: "bomba", "0318")...
                 return termsClean.every(term => {
                     let matchNoItem = false;
-
                     headers.forEach(h => {
                         const hl = h.toLowerCase();
                         if (hl === "codigo" || hl === "produto") {
-                            const valorOriginal = item[h];
-                            const valorLimpo = limparTexto(valorOriginal);
-                            
-                            // 1. Se o termo for numérico, aceita em qualquer parte (contains)
+                            const valorLimpo = limparTexto(item[h]);
+                            // Números: busca em qualquer lugar. Texto: busca no início da palavra.
                             if (!isNaN(term)) {
                                 if (valorLimpo.includes(term)) matchNoItem = true;
-                            } 
-                            // 2. Se for texto, verifica se alguma palavra começa com o termo
-                            else {
-                                const palavras = valorLimpo.split(/\s+/);
-                                if (palavras.some(p => p.startsWith(term))) matchNoItem = true;
+                            } else {
+                                if (valorLimpo.split(/\s+/).some(p => p.startsWith(term))) matchNoItem = true;
                             }
                         }
                     });
@@ -372,7 +376,7 @@
                     suggestionLink.innerText = novaFrase;
                     suggestionBox.style.display = 'block';
                 }
-                statusMsg.innerText = "Nenhum resultado.";
+                statusMsg.innerText = "Nenhum resultado encontrado.";
                 return;
             }
 
@@ -383,12 +387,15 @@
                     if (header.toLowerCase().includes("custo")) {
                         if (custoLiberado) {
                             td.innerText = item[header];
-                            td.classList.add("unlocked-cost");
+                            td.style.color = "red"; td.style.fontWeight = "bold";
                         } else {
                             td.innerHTML = "🔒 Ver";
-                            td.classList.add("locked-cell");
+                            td.className = "locked-cell";
                             td.onclick = () => {
-                                if(prompt("Senha:") === SENHA_MESTRE) { custoLiberado = true; filterData(searchInput.value); }
+                                if(prompt("Senha para ver custos:") === SENHA_MESTRE) { 
+                                    custoLiberado = true; 
+                                    filterData(searchInput.value); 
+                                }
                             }; 
                         }
                     } else {
