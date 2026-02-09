@@ -155,21 +155,7 @@
             border-radius: 4px;
             font-size: 12px;
         }
-        .locked-cell:hover {
-            background-color: #ddd;
-            color: #333;
-        }
-        .unlocked-cost {
-            color: #d32f2f;
-            font-weight: bold;
-        }
 
-        @media (max-width: 600px) {
-            h1 { font-size: 2rem; }
-            .header-container { margin-top: 20px; }
-            .date-subtitle { font-size: 0.9rem; }
-        }
-        
         .loader {
             border: 5px solid #f3f3f3;
             border-top: 5px solid var(--main-color);
@@ -190,11 +176,11 @@
         <div id="dataDisplay" class="date-subtitle"></div>
         <img src="topo.jpg" alt="Logo Topo" class="top-image" onerror="this.style.display='none'">
         <div class="loader" id="loader"></div>
-        <div id="status" class="status-msg">Conectando...</div>
+        <div id="status" class="status-msg">Carregando dados...</div>
     </div>
 
     <div class="search-container">
-        <input type="text" id="searchInput" class="search-box" placeholder="Pesquisar por Código ou Produto..." disabled>
+        <input type="text" id="searchInput" class="search-box" placeholder="Ex: Bomba 0318 ou Tubo..." disabled>
     </div>
 
     <div id="suggestionBox" class="suggestion-box">
@@ -209,198 +195,116 @@
     </div>
 
     <script>
-        // =================================================================
         // CONFIGURAÇÃO
-        // =================================================================
-        
-        // Link fornecido já com o Proxy AllOrigins embutido
-        const LINK_DA_PLANILHA = "https://api.allorigins.win/raw?url=https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv";
-        
+        // Link corrigido para extração de dados CSV via AllOrigins
+        const URL_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv";
+        const LINK_DA_PLANILHA = "https://api.allorigins.win/raw?url=" + encodeURIComponent(URL_BASE);
         const SENHA_MESTRE = "1234";
 
-        // =================================================================
+        let productsData = [], headers = [], allWordsVocabulary = [], custoLiberado = false;
+        const searchInput = document.getElementById('searchInput'), statusMsg = document.getElementById('status'), loader = document.getElementById('loader'), dataDisplay = document.getElementById('dataDisplay'), suggestionBox = document.getElementById('suggestionBox'), suggestionLink = document.getElementById('suggestionLink');
 
-        let productsData = [];
-        let headers = [];
-        let allWordsVocabulary = []; 
-        let custoLiberado = false; 
-
-        const searchInput = document.getElementById('searchInput');
-        const statusMsg = document.getElementById('status');
-        const loader = document.getElementById('loader');
-        const dataDisplay = document.getElementById('dataDisplay');
-        const suggestionBox = document.getElementById('suggestionBox');
-        const suggestionLink = document.getElementById('suggestionLink');
-
-        window.addEventListener('DOMContentLoaded', () => {
-            loadCSV();
-        });
+        window.addEventListener('DOMContentLoaded', loadCSV);
 
         function loadCSV() {
             loader.style.display = 'block';
             fetch(LINK_DA_PLANILHA)
-                .then(response => {
-                    if (!response.ok) throw new Error("Falha na conexão");
-                    return response.text();
+                .then(res => {
+                    if (!res.ok) throw new Error();
+                    return res.text();
                 })
                 .then(text => {
                     parseCSV(text);
-                    const dataHoje = new Date().toLocaleString('pt-BR');
-                    dataDisplay.innerText = "Sincronizado em: " + dataHoje;
+                    dataDisplay.innerText = "Sincronizado em: " + new Date().toLocaleString('pt-BR');
                 })
-                .catch(error => {
+                .catch(() => {
                     loader.style.display = 'none';
-                    statusMsg.innerText = "Erro ao carregar dados. Verifique a internet.";
+                    statusMsg.innerText = "Erro ao conectar. Verifique se a planilha está publicada como CSV.";
                     statusMsg.style.color = "red";
-                    console.error(error);
                 });
         }
 
         function parseCSV(text) {
-            const lines = text.split('\n').filter(line => line.trim() !== '');
-            if (lines.length === 0) return;
-
-            const separator = lines[0].includes(';') ? ';' : ','; 
-            headers = lines[0].split(separator).map(h => h.trim());
+            const lines = text.split('\n').filter(l => l.trim() !== '');
+            if (!lines.length) return;
+            const sep = lines[0].includes(';') ? ';' : ',';
+            headers = lines[0].split(sep).map(h => h.trim());
             
-            const vocabularySet = new Set();
-
+            const vSet = new Set();
             productsData = lines.slice(1).map(line => {
-                const regex = new RegExp(`(?:${separator}|\\r?\\n|^)(?:"([^"]*)"|([^"${separator}\\r\\n]*))`, 'gi');
-                let matches = [], matched;
-                while (matched = regex.exec(line)) {
-                    let val = matched[1] ? matched[1] : matched[2];
-                    matches.push(val ? val.trim() : "");
-                }
+                const regex = new RegExp(`(?:${sep}|\\r?\\n|^)(?:"([^"]*)"|([^"${sep}\\r\\n]*))`, 'gi');
+                let matches = [], m;
+                while (m = regex.exec(line)) matches.push((m[1] || m[2] || "").trim());
                 let obj = {};
-                headers.forEach((header, index) => {
-                    let val = matches[index] || "";
-                    obj[header] = val;
-
-                    // Alimenta o vocabulário para sugestões (apenas da coluna Produto)
-                    if (header.toLowerCase().includes("produto")) {
-                        limparTexto(val).split(' ').forEach(p => {
-                            if(p.length > 2) vocabularySet.add(p); 
-                        });
+                headers.forEach((h, i) => {
+                    obj[h] = matches[i] || "";
+                    if (h.toLowerCase().includes("produto")) {
+                        limparTexto(obj[h]).split(' ').forEach(p => { if(p.length > 2) vSet.add(p); });
                     }
                 });
                 return obj;
             });
-
-            allWordsVocabulary = Array.from(vocabularySet);
-
-            const tr = document.getElementById('tableHeader');
-            tr.innerHTML = '';
-            headers.forEach(header => {
-                const th = document.createElement('th');
-                th.innerText = header;
-                tr.appendChild(th);
-            });
-
-            loader.style.display = 'none';
-            statusMsg.innerText = `${productsData.length} itens disponíveis.`;
-            searchInput.disabled = false;
-            searchInput.focus();
+            allWordsVocabulary = Array.from(vSet);
+            const tr = document.getElementById('tableHeader'); tr.innerHTML = '';
+            headers.forEach(h => { const th = document.createElement('th'); th.innerText = h; tr.appendChild(th); });
+            loader.style.display = 'none'; statusMsg.innerText = `${productsData.length} itens encontrados.`; searchInput.disabled = false;
         }
 
-        function limparTexto(texto) {
-            if (!texto) return "";
-            return texto.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
-        }
+        function limparTexto(t) { return t ? t.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "") : ""; }
 
-        // Sugestão "Você quis dizer" (Levenshtein)
         function levenshtein(a, b) {
-            const matrix = [];
-            for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-            for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+            const m = [];
+            for (let i = 0; i <= b.length; i++) m[i] = [i];
+            for (let j = 0; j <= a.length; j++) m[0][j] = j;
             for (let i = 1; i <= b.length; i++) {
-                for (let j = 1; j <= a.length; j++) {
-                    matrix[i][j] = b[i-1] == a[j-1] ? matrix[i-1][j-1] : Math.min(matrix[i-1][j-1]+1, matrix[i][j-1]+1, matrix[i-1][j]+1);
-                }
+                for (let j = 1; j <= a.length; j++) m[i][j] = b[i-1] == a[j-1] ? m[i-1][j-1] : Math.min(m[i-1][j-1]+1, m[i][j-1]+1, m[i-1][j]+1);
             }
-            return matrix[b.length][a.length];
+            return m[b.length][a.length];
         }
 
-        function buscarSugestao(termo) {
-            let melhor = null, menorDist = 3;
-            allWordsVocabulary.forEach(palavra => {
-                const dist = levenshtein(termo, palavra);
-                if (dist < menorDist) { menorDist = dist; melhor = palavra; }
-            });
+        function buscarSugestao(t) {
+            let melhor = null, menor = 3;
+            allWordsVocabulary.forEach(p => { const d = levenshtein(t, p); if (d < menor) { menor = d; melhor = p; } });
             return melhor;
         }
 
-        searchInput.addEventListener('input', (e) => {
-            suggestionBox.style.display = 'none';
-            filterData(e.target.value);
-        });
+        searchInput.addEventListener('input', e => { suggestionBox.style.display = 'none'; filterData(e.target.value); });
+        suggestionLink.addEventListener('click', function() { searchInput.value = this.innerText; suggestionBox.style.display = 'none'; filterData(this.innerText); });
 
-        suggestionLink.addEventListener('click', function() {
-            searchInput.value = this.innerText;
-            suggestionBox.style.display = 'none';
-            filterData(this.innerText);
-        });
-
-        function filterData(query) {
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = ''; 
-            if (query.trim().length === 0) {
-                 statusMsg.innerText = `${productsData.length} itens disponíveis.`;
-                 return;
-            }
-
-            const termsClean = limparTexto(query).split(' ').filter(t => t.length > 0);
-
+        function filterData(q) {
+            const tbody = document.getElementById('tableBody'); tbody.innerHTML = '';
+            if (!q.trim().length) { statusMsg.innerText = `${productsData.length} itens encontrados.`; return; }
+            const tClean = limparTexto(q).split(' ').filter(t => t.length > 0);
+            
             const filtered = productsData.filter(item => {
-                return termsClean.every(term => {
-                    let matchNoItem = false;
+                return tClean.every(term => {
+                    let match = false;
                     headers.forEach(h => {
                         const hl = h.toLowerCase();
                         if (hl === "codigo" || hl === "produto") {
-                            const valorLimpo = limparTexto(item[h]);
-                            // Números: busca em qualquer lugar. Texto: busca no início da palavra.
-                            if (!isNaN(term)) {
-                                if (valorLimpo.includes(term)) matchNoItem = true;
-                            } else {
-                                if (valorLimpo.split(/\s+/).some(p => p.startsWith(term))) matchNoItem = true;
-                            }
+                            const val = limparTexto(item[h]);
+                            if (!isNaN(term)) { if (val.includes(term)) match = true; }
+                            else { if (val.split(/\s+/).some(p => p.startsWith(term))) match = true; }
                         }
                     });
-                    return matchNoItem;
+                    return match;
                 });
             });
 
-            if (filtered.length === 0) {
-                let novaFrase = termsClean.map(t => (isNaN(t) ? buscarSugestao(t) : null) || t).join(' ');
-                if(novaFrase !== termsClean.join(' ')) {
-                    suggestionLink.innerText = novaFrase;
-                    suggestionBox.style.display = 'block';
-                }
-                statusMsg.innerText = "Nenhum resultado encontrado.";
-                return;
+            if (!filtered.length) {
+                let nFrase = tClean.map(t => (isNaN(t) ? buscarSugestao(t) : null) || t).join(' ');
+                if(nFrase !== tClean.join(' ')) { suggestionLink.innerText = nFrase; suggestionBox.style.display = 'block'; }
+                statusMsg.innerText = "Nenhum resultado."; return;
             }
 
             filtered.slice(0, 500).forEach(item => {
                 const tr = document.createElement('tr');
-                headers.forEach(header => {
+                headers.forEach(h => {
                     const td = document.createElement('td');
-                    if (header.toLowerCase().includes("custo")) {
-                        if (custoLiberado) {
-                            td.innerText = item[header];
-                            td.style.color = "red"; td.style.fontWeight = "bold";
-                        } else {
-                            td.innerHTML = "🔒 Ver";
-                            td.className = "locked-cell";
-                            td.onclick = () => {
-                                if(prompt("Senha para ver custos:") === SENHA_MESTRE) { 
-                                    custoLiberado = true; 
-                                    filterData(searchInput.value); 
-                                }
-                            }; 
-                        }
-                    } else {
-                        td.innerText = item[header];
-                    }
+                    if (h.toLowerCase().includes("custo")) {
+                        if (custoLiberado) { td.innerText = item[h]; td.style.color = "red"; td.style.fontWeight = "bold"; }
+                        else { td.innerHTML = "🔒 Ver"; td.className = "locked-cell"; td.onclick = () => { if(prompt("Senha:") === SENHA_MESTRE) { custoLiberado = true; filterData(searchInput.value); } }; }
+                    } else { td.innerText = item[h]; }
                     tr.appendChild(td);
                 });
                 tbody.appendChild(tr);
