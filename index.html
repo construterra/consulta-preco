@@ -4,46 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pesquisa de Produtos - Construterra</title>
-    <link rel="icon" href="logo.png" type="image/png">
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-
     <style>
-        :root { --main-color: #00579D; --bg-light: #f1f3f4; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; background-color: #fff; }
-        .header-container { text-align: center; margin-top: 40px; width: 100%; max-width: 800px; padding: 0 20px; }
-        h1 { color: var(--main-color); font-size: 2.5rem; margin: 0; }
-        .search-container { width: 100%; max-width: 600px; margin-top: 20px; }
-        .search-box { width: 100%; padding: 14px 25px; font-size: 18px; border: 1px solid #dfe1e5; border-radius: 30px; outline: none; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .results-container { width: 95%; max-width: 1200px; margin-top: 20px; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid #e0e0e0; }
-        thead { background-color: var(--main-color); color: white; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; white-space: nowrap; }
-        .status-msg { margin-top: 10px; color: #666; font-size: 0.9rem; }
-        .error-log { color: #d32f2f; font-size: 0.85rem; margin-top: 10px; background: #fff0f0; padding: 10px; border-radius: 4px; display: none; border: 1px solid #ffcdd2; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--main-color); border-radius: 50%; width: 25px; height: 25px; animation: spin 1s linear infinite; margin: 10px auto; display: none; }
+        :root { --main-color: #00579D; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; background: #fff; }
+        .header { text-align: center; margin-top: 30px; padding: 20px; width: 100%; max-width: 600px; }
+        h1 { color: var(--main-color); margin-bottom: 10px; }
+        .search-box { width: 90%; max-width: 500px; padding: 15px 25px; font-size: 18px; border: 2px solid #ddd; border-radius: 30px; outline: none; transition: 0.3s; }
+        .search-box:focus { border-color: var(--main-color); box-shadow: 0 0 10px rgba(0,87,157,0.2); }
+        .status-area { margin: 15px; font-size: 0.9rem; color: #666; text-align: center; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--main-color); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 10px auto; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .unlocked { color: #d32f2f; font-weight: bold; }
-        .locked { cursor: pointer; color: #555; background: #eee; text-align: center; font-weight: bold; }
-        .btn-retry { background-color: var(--main-color); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 0.9rem; }
+        .results-container { width: 95%; margin-top: 20px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        thead { background: var(--main-color); color: white; }
+        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; }
+        .locked { cursor: pointer; color: #777; background: #f9f9f9; text-align: center; font-weight: bold; border-radius: 4px; }
+        .btn-emergency { background: #eee; border: 1px solid #ccc; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; margin: 5px; }
+        .btn-emergency:hover { background: #ddd; }
     </style>
 </head>
 <body>
 
-    <div class="header-container">
+    <div class="header">
         <h1>Pesquisa de Produtos</h1>
-        <img src="topo.jpg" style="max-width:100%; height:auto; max-height:100px; margin-top:10px;" onerror="this.style.display='none'">
+        <img src="topo.jpg" style="max-width:200px; margin: 10px 0;" onerror="this.style.display='none'">
         
         <div class="loader" id="loader"></div>
-        <div id="status" class="status-msg">Iniciando...</div>
+        <div id="status" class="status-area">Iniciando sistema...</div>
         
-        <div id="errorLog" class="error-log"></div>
-        <button id="btnRetry" class="btn-retry" style="display:none;" onclick="location.reload(true);">🔄 Recarregar</button>
+        <div id="emergencyTools" style="display:none;">
+            <p style="font-size: 0.8rem; margin-bottom: 5px;">Demorando muito? Tente forçar:</p>
+            <button class="btn-emergency" onclick="forcarConexao(0)">Conexão Direta</button>
+            <button class="btn-emergency" onclick="forcarConexao(1)">Servidor Reserva</button>
+        </div>
     </div>
 
-    <div class="search-container">
-        <input type="text" id="searchInput" class="search-box" placeholder="Carregando dados..." disabled>
-    </div>
+    <input type="text" id="searchInput" class="search-box" placeholder="Aguarde carregar..." disabled>
 
     <div class="results-container">
         <table id="dataTable">
@@ -53,60 +50,105 @@
     </div>
 
     <script>
-        // ==========================================
-        // CONFIGURAÇÃO OTIMIZADA
-        // ==========================================
-        const PLANILHA_ID = "2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg";
-        const GID = "349719770";
+        const PLANILHA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv";
+        const PROXIES = ["", "https://api.allorigins.win/raw?url="];
         const SENHA_MESTRE = "1234";
 
-        const URL_GOOGLE = `https://docs.google.com/spreadsheets/d/e/${PLANILHA_ID}/pub?gid=${GID}&single=true&output=csv`;
+        let productsData = [], headers = [], tentativa = 0, custoOk = false;
+        const status = document.getElementById('status'), loader = document.getElementById('loader'), 
+              searchInput = document.getElementById('searchInput'), tools = document.getElementById('emergencyTools');
 
-        // Ordem de tentativa: Direto -> AllOrigins -> ThingProxy
-        const PROXIES = [
-            "", 
-            "https://api.allorigins.win/raw?url=", 
-            "https://thingproxy.freeboard.io/fetch/"
-        ];
+        function log(msg) { status.innerText = msg; console.log(msg); }
 
-        let tentativaAtual = 0;
-        let productsData = [];
-        let headers = [];
-        let custoLiberado = false;
-
-        const statusMsg = document.getElementById('status');
-        const errorLog = document.getElementById('errorLog');
-        const loader = document.getElementById('loader');
-        const searchInput = document.getElementById('searchInput');
-        const btnRetry = document.getElementById('btnRetry');
-
-        window.onload = carregarDados;
-
-        function carregarDados() {
+        function carregar(index) {
+            tentativa = index;
             loader.style.display = 'block';
-            errorLog.style.display = 'none';
-            btnRetry.style.display = 'none';
+            tools.style.display = 'block'; // Mostra opções se demorar
             
-            let proxyUsado = PROXIES[tentativaAtual];
-            let urlFinal = proxyUsado === "" ? URL_GOOGLE : proxyUsado + encodeURIComponent(URL_GOOGLE);
-            
-            statusMsg.innerText = proxyUsado === "" ? "Conectando diretamente ao Google..." : `Tentando via servidor reserva ${tentativaAtual}...`;
+            let url = PROXIES[index] === "" ? PLANILHA_URL : PROXIES[index] + encodeURIComponent(PLANILHA_URL);
+            log(index === 0 ? "Tentando Conexão Direta (recomendado)..." : "Tentando via Servidor Reserva...");
 
-            Papa.parse(urlFinal, {
+            Papa.parse(url, {
                 download: true,
                 header: true,
                 skipEmptyLines: true,
-                encoding: "UTF-8",
-                complete: function(results) {
-                    loader.style.display = 'none';
+                error: (err) => {
+                    console.error(err);
+                    proximaTentativa();
+                },
+                complete: (results) => {
                     if (results.data && results.data.length > 0) {
-                        productsData = results.data;
-                        headers = results.meta.fields;
-                        montarCabecalho();
-                        statusMsg.innerText = `✅ ${productsData.length} produtos prontos.`;
-                        searchInput.disabled = false;
-                        searchInput.placeholder = "Digite o código ou nome do produto...";
-                        searchInput.focus();
+                        sucesso(results);
                     } else {
-                        lidarComErro("Dados vazios recebidos.");
+                        proximaTentativa();
                     }
+                }
+            });
+        }
+
+        function proximaTentativa() {
+            if (tentativa < PROXIES.length - 1) {
+                carregar(tentativa + 1);
+            } else {
+                loader.style.display = 'none';
+                log("❌ Não foi possível conectar. Tente recarregar a página ou verifique a internet.");
+            }
+        }
+
+        function forcarConexao(i) {
+            location.reload(); // Para limpar tudo antes de forçar
+            carregar(i);
+        }
+
+        function sucesso(results) {
+            loader.style.display = 'none';
+            tools.style.display = 'none';
+            productsData = results.data;
+            headers = results.meta.fields;
+            
+            const tr = document.getElementById('tableHeader');
+            tr.innerHTML = '';
+            headers.forEach(h => { let th = document.createElement('th'); th.innerText = h; tr.appendChild(th); });
+            
+            log(`✅ ${productsData.length} produtos carregados!`);
+            searchInput.disabled = false;
+            searchInput.placeholder = "Pesquisar código ou nome...";
+            searchInput.focus();
+        }
+
+        searchInput.addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            if (!val.trim()) return;
+
+            const termos = val.split(' ').filter(t => t.length > 0);
+            const filtrados = productsData.filter(item => {
+                return termos.every(t => {
+                    return Object.values(item).some(v => 
+                        v.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "").includes(t)
+                    );
+                });
+            });
+
+            filtrados.slice(0, 50).forEach(item => {
+                let tr = document.createElement('tr');
+                headers.forEach(h => {
+                    let td = document.createElement('td');
+                    if (h.toLowerCase().includes('custo')) {
+                        if (custoOk) { td.innerText = item[h]; td.style.color = 'red'; td.style.fontWeight = 'bold'; }
+                        else { 
+                            td.innerText = "🔒 Ver"; td.className = "locked"; 
+                            td.onclick = () => { if(prompt("Senha:") === SENHA_MESTRE) { custoOk = true; searchInput.dispatchEvent(new Event('input')); } };
+                        }
+                    } else { td.innerText = item[h]; }
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        });
+
+        window.onload = () => carregar(0);
+    </script>
+</body>
+</html>
