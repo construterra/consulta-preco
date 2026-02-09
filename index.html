@@ -4,187 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pesquisa de Produtos</title>
-    
     <link rel="icon" href="logo.png" type="image/png">
-    <link rel="apple-touch-icon" href="logo.png">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 
     <style>
-        :root {
-            --main-color: #00579D; 
-            --bg-light: #f1f3f4;
-            --border-color: #dfe1e5;
-            --locked-color: #777;
-            --text-gray: #666;
-            --link-blue: #1a0dab;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            background-color: #fff;
-        }
-
-        .header-container {
-            text-align: center;
-            margin-top: 40px;
-            margin-bottom: 20px;
-            width: 100%;
-            max-width: 800px;
-            padding: 0 20px;
-            box-sizing: border-box;
-        }
-
-        h1 {
-            color: var(--main-color);
-            font-size: 3rem;
-            margin-bottom: 5px; 
-            margin-top: 0;
-            letter-spacing: -1px;
-        }
-
-        .date-subtitle {
-            font-size: 1rem;
-            color: var(--text-gray);
-            margin-bottom: 25px;
-            font-weight: 500;
-        }
-
-        .top-image {
-            max-width: 100%;
-            height: auto;
-            max-height: 150px;
-            display: block;
-            margin: 0 auto 30px auto;
-            border-radius: 4px;
-        }
-
-        .search-container {
-            width: 100%;
-            max-width: 600px;
-            position: relative;
-            display: block; 
-            margin-bottom: 10px;
-        }
-
-        .search-box {
-            width: 100%;
-            padding: 14px 25px;
-            font-size: 18px;
-            border: 1px solid var(--border-color);
-            border-radius: 30px;
-            outline: none;
-            box-shadow: 0 2px 8px rgba(32,33,36,.2);
-            transition: all 0.2s;
-            box-sizing: border-box;
-        }
-
-        .search-box:focus {
-            box-shadow: 0 4px 12px rgba(32,33,36,.3);
-            border-color: var(--main-color);
-        }
-
-        .suggestion-box {
-            text-align: left;
-            width: 100%;
-            max-width: 600px;
-            margin-bottom: 15px;
-            font-size: 16px;
-            color: #cc0000; 
-            display: none; 
-            padding-left: 15px;
-        }
-        
-        .suggestion-link {
-            color: var(--link-blue);
-            font-weight: bold;
-            font-style: italic;
-            cursor: pointer;
-            text-decoration: underline;
-        }
-
-        .status-msg {
-            margin-top: 10px;
-            color: #666;
-            font-size: 0.9rem;
-            min-height: 1.2em;
-        }
-
-        .results-container {
-            width: 95%;
-            max-width: 1200px;
-            margin-top: 10px;
-            overflow-x: auto;
-            margin-bottom: 50px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.05);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-            border: 1px solid #e0e0e0;
-        }
-
-        thead {
-            background-color: var(--main-color);
-            color: white;
-        }
-
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-            white-space: nowrap;
-        }
-
-        tr:hover {
-            background-color: #f5f5f5;
-        }
-
-        .locked-cell {
-            color: var(--locked-color);
-            cursor: pointer;
-            background-color: #eee;
-            text-align: center;
-            font-weight: bold;
-            border-radius: 4px;
-            font-size: 12px;
-        }
-
-        .loader {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid var(--main-color);
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-            display: none;
-        }
+        :root { --main-color: #00579D; --bg-light: #f1f3f4; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; background-color: #fff; }
+        .header-container { text-align: center; margin-top: 40px; width: 100%; max-width: 800px; padding: 0 20px; }
+        h1 { color: var(--main-color); font-size: 2.5rem; margin: 0; }
+        .search-container { width: 100%; max-width: 600px; margin-top: 20px; }
+        .search-box { width: 100%; padding: 14px 25px; font-size: 18px; border: 1px solid #dfe1e5; border-radius: 30px; outline: none; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .results-container { width: 95%; max-width: 1200px; margin-top: 20px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid #e0e0e0; }
+        thead { background-color: var(--main-color); color: white; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; white-space: nowrap; }
+        .status-msg { margin-top: 10px; color: #666; font-size: 0.9rem; }
+        .error-log { color: red; font-size: 0.8rem; margin-top: 5px; background: #fff0f0; padding: 5px; border-radius: 4px; display: none; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--main-color); border-radius: 50%; width: 25px; height: 25px; animation: spin 1s linear infinite; margin: 10px auto; display: none; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .unlocked { color: #d32f2f; font-weight: bold; }
+        .locked { cursor: pointer; color: #555; background: #eee; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="header-container">
         <h1>Pesquisa de Produtos</h1>
-        <div id="dataDisplay" class="date-subtitle"></div>
-        <img src="topo.jpg" alt="Logo Topo" class="top-image" onerror="this.style.display='none'">
+        <img src="topo.jpg" style="max-width:100%; height:auto; max-height:100px; margin-top:10px;" onerror="this.style.display='none'">
         <div class="loader" id="loader"></div>
-        <div id="status" class="status-msg">Carregando dados...</div>
+        <div id="status" class="status-msg">Iniciando sistema...</div>
+        <div id="errorLog" class="error-log"></div>
     </div>
 
     <div class="search-container">
-        <input type="text" id="searchInput" class="search-box" placeholder="Ex: Bomba 0318 ou Tubo..." disabled>
-    </div>
-
-    <div id="suggestionBox" class="suggestion-box">
-        Você quis dizer: <span id="suggestionLink" class="suggestion-link"></span>?
+        <input type="text" id="searchInput" class="search-box" placeholder="Aguarde carregar..." disabled>
     </div>
 
     <div class="results-container">
@@ -195,121 +49,154 @@
     </div>
 
     <script>
-        // CONFIGURAÇÃO
-        // Link corrigido para extração de dados CSV via AllOrigins
-        const URL_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv";
-        const LINK_DA_PLANILHA = "https://api.allorigins.win/raw?url=" + encodeURIComponent(URL_BASE);
+        // --- CONFIGURAÇÃO ---
+        // Seu Link Original (2PAC...)
+        const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv";
+        
+        // Proxy AllOrigins para evitar bloqueio
+        const PROXY_URL = "https://api.allorigins.win/raw?url=" + encodeURIComponent(GOOGLE_SHEET_URL);
+        
         const SENHA_MESTRE = "1234";
+        // --------------------
 
-        let productsData = [], headers = [], allWordsVocabulary = [], custoLiberado = false;
-        const searchInput = document.getElementById('searchInput'), statusMsg = document.getElementById('status'), loader = document.getElementById('loader'), dataDisplay = document.getElementById('dataDisplay'), suggestionBox = document.getElementById('suggestionBox'), suggestionLink = document.getElementById('suggestionLink');
+        let productsData = [];
+        let headers = [];
+        let custoLiberado = false;
 
-        window.addEventListener('DOMContentLoaded', loadCSV);
+        const statusMsg = document.getElementById('status');
+        const errorLog = document.getElementById('errorLog');
+        const loader = document.getElementById('loader');
+        const searchInput = document.getElementById('searchInput');
 
-        function loadCSV() {
+        window.onload = function() {
+            carregarDados();
+        };
+
+        function carregarDados() {
             loader.style.display = 'block';
-            fetch(LINK_DA_PLANILHA)
-                .then(res => {
-                    if (!res.ok) throw new Error();
-                    return res.text();
-                })
-                .then(text => {
-                    parseCSV(text);
-                    dataDisplay.innerText = "Sincronizado em: " + new Date().toLocaleString('pt-BR');
-                })
-                .catch(() => {
+            statusMsg.innerText = "Baixando planilha...";
+            
+            // Usando PapaParse para baixar e processar
+            Papa.parse(PROXY_URL, {
+                download: true,
+                header: true,         // Entende que a primeira linha é cabeçalho
+                skipEmptyLines: true, // Ignora linhas vazias
+                encoding: "UTF-8",    // Garante acentuação correta
+                complete: function(results) {
                     loader.style.display = 'none';
-                    statusMsg.innerText = "Erro ao conectar. Verifique se a planilha está publicada como CSV.";
-                    statusMsg.style.color = "red";
-                });
-        }
-
-        function parseCSV(text) {
-            const lines = text.split('\n').filter(l => l.trim() !== '');
-            if (!lines.length) return;
-            const sep = lines[0].includes(';') ? ';' : ',';
-            headers = lines[0].split(sep).map(h => h.trim());
-            
-            const vSet = new Set();
-            productsData = lines.slice(1).map(line => {
-                const regex = new RegExp(`(?:${sep}|\\r?\\n|^)(?:"([^"]*)"|([^"${sep}\\r\\n]*))`, 'gi');
-                let matches = [], m;
-                while (m = regex.exec(line)) matches.push((m[1] || m[2] || "").trim());
-                let obj = {};
-                headers.forEach((h, i) => {
-                    obj[h] = matches[i] || "";
-                    if (h.toLowerCase().includes("produto")) {
-                        limparTexto(obj[h]).split(' ').forEach(p => { if(p.length > 2) vSet.add(p); });
+                    
+                    if (results.data && results.data.length > 0) {
+                        productsData = results.data;
+                        headers = results.meta.fields; // Pega os nomes das colunas automaticamente
+                        
+                        montarCabecalho();
+                        statusMsg.innerText = `${productsData.length} produtos carregados com sucesso!`;
+                        searchInput.disabled = false;
+                        searchInput.placeholder = "Pesquisar Código ou Produto...";
+                        searchInput.focus();
+                    } else {
+                        mostrarErro("A planilha parece estar vazia ou ilegível.");
                     }
-                });
-                return obj;
+                },
+                error: function(err) {
+                    loader.style.display = 'none';
+                    mostrarErro("Erro no download: " + err.message);
+                }
             });
-            allWordsVocabulary = Array.from(vSet);
-            const tr = document.getElementById('tableHeader'); tr.innerHTML = '';
-            headers.forEach(h => { const th = document.createElement('th'); th.innerText = h; tr.appendChild(th); });
-            loader.style.display = 'none'; statusMsg.innerText = `${productsData.length} itens encontrados.`; searchInput.disabled = false;
         }
 
-        function limparTexto(t) { return t ? t.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "") : ""; }
+        function mostrarErro(msg) {
+            statusMsg.innerText = "Falha ao carregar.";
+            statusMsg.style.color = "red";
+            errorLog.style.display = "block";
+            errorLog.innerText = "Detalhe técnico: " + msg;
+        }
 
-        function levenshtein(a, b) {
-            const m = [];
-            for (let i = 0; i <= b.length; i++) m[i] = [i];
-            for (let j = 0; j <= a.length; j++) m[0][j] = j;
-            for (let i = 1; i <= b.length; i++) {
-                for (let j = 1; j <= a.length; j++) m[i][j] = b[i-1] == a[j-1] ? m[i-1][j-1] : Math.min(m[i-1][j-1]+1, m[i][j-1]+1, m[i-1][j]+1);
+        function montarCabecalho() {
+            const tr = document.getElementById('tableHeader');
+            tr.innerHTML = '';
+            headers.forEach(h => {
+                let th = document.createElement('th');
+                th.innerText = h;
+                tr.appendChild(th);
+            });
+        }
+
+        // --- SISTEMA DE PESQUISA HÍBRIDO (Igual ao anterior) ---
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value;
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            if (!query.trim()) {
+                statusMsg.innerText = `${productsData.length} itens disponíveis.`;
+                return;
             }
-            return m[b.length][a.length];
-        }
 
-        function buscarSugestao(t) {
-            let melhor = null, menor = 3;
-            allWordsVocabulary.forEach(p => { const d = levenshtein(t, p); if (d < menor) { menor = d; melhor = p; } });
-            return melhor;
-        }
+            const termos = limpar(query).split(' ').filter(t => t.length > 0);
 
-        searchInput.addEventListener('input', e => { suggestionBox.style.display = 'none'; filterData(e.target.value); });
-        suggestionLink.addEventListener('click', function() { searchInput.value = this.innerText; suggestionBox.style.display = 'none'; filterData(this.innerText); });
-
-        function filterData(q) {
-            const tbody = document.getElementById('tableBody'); tbody.innerHTML = '';
-            if (!q.trim().length) { statusMsg.innerText = `${productsData.length} itens encontrados.`; return; }
-            const tClean = limparTexto(q).split(' ').filter(t => t.length > 0);
-            
-            const filtered = productsData.filter(item => {
-                return tClean.every(term => {
-                    let match = false;
-                    headers.forEach(h => {
-                        const hl = h.toLowerCase();
-                        if (hl === "codigo" || hl === "produto") {
-                            const val = limparTexto(item[h]);
-                            if (!isNaN(term)) { if (val.includes(term)) match = true; }
-                            else { if (val.split(/\s+/).some(p => p.startsWith(term))) match = true; }
+            const filtrados = productsData.filter(item => {
+                return termos.every(termo => {
+                    let achou = false;
+                    // Procura em todas as colunas
+                    Object.keys(item).forEach(key => {
+                        const chave = key.toLowerCase();
+                        if (chave.includes('codigo') || chave.includes('produto')) {
+                            const val = limpar(item[key] || "");
+                            
+                            // Lógica Híbrida:
+                            if (!isNaN(termo)) { 
+                                // Se for número, busca em qualquer lugar
+                                if (val.includes(termo)) achou = true;
+                            } else {
+                                // Se for texto, busca início da palavra
+                                if (val.split(/\s+/).some(p => p.startsWith(termo))) achou = true;
+                            }
                         }
                     });
-                    return match;
+                    return achou;
                 });
             });
 
-            if (!filtered.length) {
-                let nFrase = tClean.map(t => (isNaN(t) ? buscarSugestao(t) : null) || t).join(' ');
-                if(nFrase !== tClean.join(' ')) { suggestionLink.innerText = nFrase; suggestionBox.style.display = 'block'; }
-                statusMsg.innerText = "Nenhum resultado."; return;
+            if (filtrados.length === 0) {
+                statusMsg.innerText = "Nenhum resultado encontrado.";
+                return;
             }
 
-            filtered.slice(0, 500).forEach(item => {
-                const tr = document.createElement('tr');
-                headers.forEach(h => {
-                    const td = document.createElement('td');
-                    if (h.toLowerCase().includes("custo")) {
-                        if (custoLiberado) { td.innerText = item[h]; td.style.color = "red"; td.style.fontWeight = "bold"; }
-                        else { td.innerHTML = "🔒 Ver"; td.className = "locked-cell"; td.onclick = () => { if(prompt("Senha:") === SENHA_MESTRE) { custoLiberado = true; filterData(searchInput.value); } }; }
-                    } else { td.innerText = item[h]; }
+            statusMsg.innerText = `${filtrados.length} encontrados.`;
+
+            // Exibir resultados (Limitado a 100 para não travar)
+            filtrados.slice(0, 100).forEach(item => {
+                let tr = document.createElement('tr');
+                headers.forEach(col => {
+                    let td = document.createElement('td');
+                    
+                    if (col.toLowerCase().includes('custo')) {
+                        if (custoLiberado) {
+                            td.innerText = item[col];
+                            td.className = "unlocked";
+                        } else {
+                            td.innerText = "🔒 Ver";
+                            td.className = "locked";
+                            td.onclick = () => {
+                                if (prompt("Senha:") === SENHA_MESTRE) {
+                                    custoLiberado = true;
+                                    // Dispara o evento de input para recarregar a tabela
+                                    searchInput.dispatchEvent(new Event('input'));
+                                }
+                            };
+                        }
+                    } else {
+                        td.innerText = item[col];
+                    }
                     tr.appendChild(td);
                 });
                 tbody.appendChild(tr);
             });
-            statusMsg.innerText = `${filtered.length} encontrados.`;
+        });
+
+        function limpar(txt) {
+            return txt.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
         }
     </script>
 </body>
