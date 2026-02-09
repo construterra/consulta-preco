@@ -38,7 +38,7 @@
     </div>
 
     <div class="search-container">
-        <input type="text" id="searchInput" class="search-box" placeholder="Aguarde carregar..." disabled>
+        <input type="text" id="searchInput" class="search-box" placeholder="Carregando..." disabled>
     </div>
 
     <div class="results-container">
@@ -50,11 +50,14 @@
 
     <script>
         // --- CONFIGURAÇÃO ---
-        // Seu Link Original (2PAC...)
-        const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg/pub?gid=349719770&single=true&output=csv";
+        const PLANILHA_ID = "2PACX-1vQWp9C6rGx8WZsJ0HGv6mhzPsvQSkNVvmb_n_SxYBDJdRk1r8lvF8empPtTrZz0cg";
+        const GID = "349719770";
         
-        // Proxy AllOrigins para evitar bloqueio
-        const PROXY_URL = "https://api.allorigins.win/raw?url=" + encodeURIComponent(GOOGLE_SHEET_URL);
+        // Monta o link CSV oficial
+        const GOOGLE_CSV = `https://docs.google.com/spreadsheets/d/e/${PLANILHA_ID}/pub?gid=${GID}&single=true&output=csv`;
+        
+        // PROXY NOVO (AllOrigins) - O antigo (corsproxy) foi removido
+        const PROXY_URL = "https://api.allorigins.win/raw?url=" + encodeURIComponent(GOOGLE_CSV);
         
         const SENHA_MESTRE = "1234";
         // --------------------
@@ -74,42 +77,40 @@
 
         function carregarDados() {
             loader.style.display = 'block';
-            statusMsg.innerText = "Baixando planilha...";
+            statusMsg.innerText = "Conectando ao banco de dados...";
             
-            // Usando PapaParse para baixar e processar
             Papa.parse(PROXY_URL, {
                 download: true,
-                header: true,         // Entende que a primeira linha é cabeçalho
-                skipEmptyLines: true, // Ignora linhas vazias
-                encoding: "UTF-8",    // Garante acentuação correta
+                header: true,
+                skipEmptyLines: true,
+                encoding: "UTF-8",
                 complete: function(results) {
                     loader.style.display = 'none';
-                    
                     if (results.data && results.data.length > 0) {
                         productsData = results.data;
-                        headers = results.meta.fields; // Pega os nomes das colunas automaticamente
-                        
+                        headers = results.meta.fields;
                         montarCabecalho();
-                        statusMsg.innerText = `${productsData.length} produtos carregados com sucesso!`;
+                        statusMsg.innerText = `${productsData.length} produtos carregados.`;
                         searchInput.disabled = false;
-                        searchInput.placeholder = "Pesquisar Código ou Produto...";
+                        searchInput.placeholder = "Pesquisar...";
                         searchInput.focus();
                     } else {
-                        mostrarErro("A planilha parece estar vazia ou ilegível.");
+                        mostrarErro("Planilha vazia ou formato inválido.");
                     }
                 },
                 error: function(err) {
                     loader.style.display = 'none';
-                    mostrarErro("Erro no download: " + err.message);
+                    // Tenta identificar se o erro é o proxy
+                    mostrarErro("Falha na conexão. (CORS/Rede). " + err.message);
                 }
             });
         }
 
         function mostrarErro(msg) {
-            statusMsg.innerText = "Falha ao carregar.";
+            statusMsg.innerText = "Erro ao carregar.";
             statusMsg.style.color = "red";
             errorLog.style.display = "block";
-            errorLog.innerText = "Detalhe técnico: " + msg;
+            errorLog.innerText = msg + " | Tente recarregar a página.";
         }
 
         function montarCabecalho() {
@@ -122,34 +123,24 @@
             });
         }
 
-        // --- SISTEMA DE PESQUISA HÍBRIDO (Igual ao anterior) ---
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value;
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
-
-            if (!query.trim()) {
-                statusMsg.innerText = `${productsData.length} itens disponíveis.`;
-                return;
-            }
+            if (!query.trim()) { statusMsg.innerText = `${productsData.length} itens.`; return; }
 
             const termos = limpar(query).split(' ').filter(t => t.length > 0);
-
+            
             const filtrados = productsData.filter(item => {
                 return termos.every(termo => {
                     let achou = false;
-                    // Procura em todas as colunas
                     Object.keys(item).forEach(key => {
                         const chave = key.toLowerCase();
                         if (chave.includes('codigo') || chave.includes('produto')) {
                             const val = limpar(item[key] || "");
-                            
-                            // Lógica Híbrida:
                             if (!isNaN(termo)) { 
-                                // Se for número, busca em qualquer lugar
                                 if (val.includes(termo)) achou = true;
                             } else {
-                                // Se for texto, busca início da palavra
                                 if (val.split(/\s+/).some(p => p.startsWith(termo))) achou = true;
                             }
                         }
@@ -158,19 +149,13 @@
                 });
             });
 
-            if (filtrados.length === 0) {
-                statusMsg.innerText = "Nenhum resultado encontrado.";
-                return;
-            }
-
+            if (filtrados.length === 0) { statusMsg.innerText = "Nada encontrado."; return; }
             statusMsg.innerText = `${filtrados.length} encontrados.`;
 
-            // Exibir resultados (Limitado a 100 para não travar)
             filtrados.slice(0, 100).forEach(item => {
                 let tr = document.createElement('tr');
                 headers.forEach(col => {
                     let td = document.createElement('td');
-                    
                     if (col.toLowerCase().includes('custo')) {
                         if (custoLiberado) {
                             td.innerText = item[col];
@@ -181,14 +166,11 @@
                             td.onclick = () => {
                                 if (prompt("Senha:") === SENHA_MESTRE) {
                                     custoLiberado = true;
-                                    // Dispara o evento de input para recarregar a tabela
                                     searchInput.dispatchEvent(new Event('input'));
                                 }
                             };
                         }
-                    } else {
-                        td.innerText = item[col];
-                    }
+                    } else { td.innerText = item[col]; }
                     tr.appendChild(td);
                 });
                 tbody.appendChild(tr);
